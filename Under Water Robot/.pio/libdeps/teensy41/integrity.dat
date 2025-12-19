@@ -1,0 +1,6 @@
+jrowberg/I2Cdevlib-Core
+sparkfun/SparkFun MS5803-14BA Pressure Sensor
+adafruit/Adafruit Unified Sensor
+adafruit/Adafruit LSM9DS0 Library
+robtillaart/RunningAverage@^0.4.7
+br3ttb/PID@^1.2.1
