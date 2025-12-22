@@ -1,0 +1,5 @@
+https://github.com/adafruit/Adafruit_LSM9DS0.git
+https://github.com/adafruit/Adafruit_Sensor.git
+Wire
+SPI
+adafruit/Adafruit BusIO @ ^1.14.5
