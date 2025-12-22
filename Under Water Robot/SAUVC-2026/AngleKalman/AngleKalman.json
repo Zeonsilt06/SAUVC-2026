@@ -1,9 +1,0 @@
-{
-    "name": "AngleKalman",
-    "version": "1.0.0",
-    "author": "Muhammad Fauzan Ridho",
-    "license": "MIT",
-    "description": "A simple library to fuse 9-DoF IMU data into Euler Angle Pitch Roll Yaw",
-    "dependencies": []
-  }
-  
