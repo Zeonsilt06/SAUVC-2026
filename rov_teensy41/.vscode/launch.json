@@ -12,9 +12,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "c:/Users/Administrator/Documents/PlatformIO/Projects/rov_teensy41/.pio/build/teensy41/firmware.elf",
+            "executable": "C:/Users/User/Downloads/lomba Sauvc/SAUVC-2026/rov_teensy41/.pio/build/teensy41/firmware.elf",
             "projectEnvName": "teensy41",
-            "toolchainBinDir": "C:/Users/Administrator/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin",
+            "toolchainBinDir": "C:/Users/User/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "preLaunchTask": {
                 "type": "PlatformIO",
@@ -25,18 +25,18 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "c:/Users/Administrator/Documents/PlatformIO/Projects/rov_teensy41/.pio/build/teensy41/firmware.elf",
+            "executable": "C:/Users/User/Downloads/lomba Sauvc/SAUVC-2026/rov_teensy41/.pio/build/teensy41/firmware.elf",
             "projectEnvName": "teensy41",
-            "toolchainBinDir": "C:/Users/Administrator/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin",
+            "toolchainBinDir": "C:/Users/User/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin",
             "internalConsoleOptions": "openOnSessionStart"
         },
         {
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (without uploading)",
-            "executable": "c:/Users/Administrator/Documents/PlatformIO/Projects/rov_teensy41/.pio/build/teensy41/firmware.elf",
+            "executable": "C:/Users/User/Downloads/lomba Sauvc/SAUVC-2026/rov_teensy41/.pio/build/teensy41/firmware.elf",
             "projectEnvName": "teensy41",
-            "toolchainBinDir": "C:/Users/Administrator/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin",
+            "toolchainBinDir": "C:/Users/User/.platformio/packages/toolchain-gccarmnoneeabi-teensy/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "loadMode": "manual"
         }

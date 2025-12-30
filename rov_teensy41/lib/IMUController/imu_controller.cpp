@@ -20,8 +20,8 @@ bool IMUController::begin() {
     if (!lsm.begin()) {
         Serial.println("[IMU] ERROR: Failed to initialize!");
         Serial.println("[IMU] Check wiring:");
-        Serial.println("  SDA -> Pin 18 (Teensy 4.1)");
-        Serial.println("  SCL -> Pin 19 (Teensy 4.1)");
+        Serial.println("  SDA -> Pin 26 (Teensy 4.1)");
+        Serial.println("  SCL -> Pin 27 (Teensy 4.1)");
         Serial.println("  VIN -> 3.3V");
         Serial.println("  GND -> GND");
         return false;
