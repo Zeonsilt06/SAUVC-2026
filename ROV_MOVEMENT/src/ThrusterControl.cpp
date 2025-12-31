@@ -19,7 +19,8 @@ static const int cw_V  = 1600;
 static const int ccw_V = 1400;
 
 /* ================= SERVOS ================= */
-static Servo thrus_1, thrus_2, thrus_3, thrus_4;
+static Servo thrus_1, thrus_2, //horizontal 
+            thrus_3, thrus_4; //vertical
 
 /* ================= INTERNAL ================= */
 static void smoothMove(int t1, int t2, int t3, int t4);
