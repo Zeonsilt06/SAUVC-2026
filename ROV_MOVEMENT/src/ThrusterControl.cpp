@@ -6,9 +6,12 @@ static int thrusterPWM_2 = 1500;
 static int thrusterPWM_3 = 1500;
 static int thrusterPWM_4 = 1500;
 
+#define PWM_MIN 1100
+#define PWM_MAX 1900
+
 /* ================= PARAMETERS ================= */
-static const int step_size  = 2;
-static const int step_delay = 25;
+static const int step_size  = 3;
+static const int step_delay = 10;
 
 /* Horizontal */
 static const int cw_H  = 1600;
@@ -48,12 +51,18 @@ static void smoothMove(int t1, int t2, int t3, int t4)
         stepTo(&thrusterPWM_3, t3);
         stepTo(&thrusterPWM_4, t4);
 
+        // HARD LIMIT (ANTI ESC DAMAGE)
+        thrusterPWM_1 = constrain(thrusterPWM_1, PWM_MIN, PWM_MAX);
+        thrusterPWM_2 = constrain(thrusterPWM_2, PWM_MIN, PWM_MAX);
+        thrusterPWM_3 = constrain(thrusterPWM_3, PWM_MIN, PWM_MAX);
+        thrusterPWM_4 = constrain(thrusterPWM_4, PWM_MIN, PWM_MAX);
+
         thrus_1.writeMicroseconds(thrusterPWM_1);
         thrus_2.writeMicroseconds(thrusterPWM_2);
         thrus_3.writeMicroseconds(thrusterPWM_3);
         thrus_4.writeMicroseconds(thrusterPWM_4);
 
-        delay(step_delay);
+        delay(10); 
     }
 }
 

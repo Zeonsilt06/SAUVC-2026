@@ -9,20 +9,16 @@ class IMU
 {
 public:
     IMU();
-
     bool begin();
     void update();
 
-    // Getter
     float getYaw();
     float getPitch();
     float getRoll();
 
 private:
-    // Sensor object
     LSM9DS0 imu;
 
-    // Raw & processed data
     float ax, ay, az;
     float gx, gy, gz;
     float mx, my, mz;

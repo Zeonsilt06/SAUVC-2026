@@ -14,6 +14,7 @@ PID::PID(double kp, double ki, double kd,
     _angleMode = angleMode;
 
     _setpoint = 0.0;
+
     reset();
 }
 
@@ -47,33 +48,48 @@ double PID::compute(double input)
     unsigned long now = millis();
     double dt = (double)(now - _lastTime) / 1000.0;
 
-    if (dt <= 0.0) return 0.0;
-    if (dt > 0.5) dt = 0.05;
+    if (dt <= 0.0)
+        return 0.0;
+
+    // Proteksi jika loop lama (misal delay / serial)
+    if (dt > 0.5)
+        dt = 0.05;
 
     double error = _setpoint - input;
+    // DEADZONE (anti jitter)
+    if (abs(error) < 0.5)
+    error = 0;
 
-    if (_angleMode) {
-        if (error > 180.0) error -= 360.0;
-        else if (error < -180.0) error += 360.0;
+    // Mode sudut (yaw)
+    if (_angleMode)
+    {
+        if (error > 180.0)
+            error -= 360.0;
+        else if (error < -180.0)
+            error += 360.0;
     }
 
-    double p = _kp * error;
+    // Proportional
+    double P = _kp * error;
 
+    // Integral (anti wind-up)
     _integral += error * dt;
-    double i = _ki * _integral;
+    double I = _ki * _integral;
 
-    if (i > _maxOut) {
-        i = _maxOut;
+    if (I > _maxOut) {
+        I = _maxOut;
         _integral -= error * dt;
-    } else if (i < _minOut) {
-        i = _minOut;
+    }
+    else if (I < _minOut) {
+        I = _minOut;
         _integral -= error * dt;
     }
 
-    double d = _kd * (error - _lastError) / dt;
+    // Derivative
+    double D = _kd * (error - _lastError) / dt;
 
     _lastError = error;
     _lastTime = now;
 
-    return constrain(p + i + d, _minOut, _maxOut);
+    return constrain(P + I + D, _minOut, _maxOut);
 }

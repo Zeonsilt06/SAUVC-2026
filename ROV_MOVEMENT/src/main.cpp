@@ -7,58 +7,56 @@
 #define BAUD_RATE 9600
 
 IMU imu;
+DepthController depth;
+
+// PID DEPTH
+PID depthPID(
+    2.0,    // Kp
+    0.05,   // Ki
+    0.8,    // Kd
+    -150,   // min output
+    150,    // max output
+    false   // bukan angle
+);
 
 void setup()
-{   
+{
     Serial.begin(BAUD_RATE);
 
     initMotor();
     stopAll();
+    delay(3000); // ARM ESC (WAJIB)
 
-    if (imu.begin())
-    {
-        Serial.println("IMU OK");
-    }
-    else
-    {
-        Serial.println("IMU FAIL");
-    }
+    imu.begin();
+    depth.begin(Wire);
+
+    depthPID.setSetpoint(85.0); // target depth cm
+
+    Serial.println("SYSTEM READY");
 }
 
 void loop()
 {
-
-    // while(simulation)
-    // {
-    //     //put ur code here
-    // }
-    
     imu.update();
+    depth.update();
 
-    float yaw = imu.getYaw();
-    float pitch = imu.getPitch();
-    float roll = imu.getRoll();
+    float currentDepth = depth.getDepth();
 
-    Serial.print("Yaw: ");
-    Serial.print(yaw);
-    Serial.print(" | Pitch: ");
-    Serial.print(pitch);
-    Serial.print(" | Roll: ");
-    Serial.println(roll);
+    // FAILSAFE SENSOR
+    if (isnan(currentDepth))
+    {
+        stopAll();
+        return;
+    }
 
-    // Contoh gerakan
-    forward(0);
-    delay(3000);
+    int depthOffset = (int)depthPID.compute(currentDepth);
 
-    rotateRight(0);
-    delay(3000);
+    up(depthOffset);
 
-    up(0);
-    delay(3000);
+    Serial.print("Depth: ");
+    Serial.print(currentDepth);
+    Serial.print(" cm | PID: ");
+    Serial.println(depthOffset);
 
-    rotateLeftUp(0, 0);
-    delay(3000);
-
-    stopAll();
-    delay(4000);
+    delay(50);
 }

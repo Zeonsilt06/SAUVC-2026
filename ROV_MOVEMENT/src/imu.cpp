@@ -1,7 +1,6 @@
 #include "imu.h"
 #include <math.h>
 
-/* I2C Address */
 #define LSM9DS0_XM  0x1D
 #define LSM9DS0_G   0x6B
 
@@ -17,8 +16,7 @@ IMU::IMU() :
 
 bool IMU::begin()
 {
-    uint16_t status = imu.begin();
-    return (status == 0x49D4);
+    return (imu.begin() == 0x49D4);
 }
 
 void IMU::update()
@@ -31,39 +29,22 @@ void IMU::update()
     ay = imu.calcAccel(imu.ay);
     az = imu.calcAccel(imu.az);
 
-    gx = imu.calcGyro(imu.gx);
-    gy = imu.calcGyro(imu.gy);
-    gz = imu.calcGyro(imu.gz);
-
     mx = imu.calcMag(imu.mx);
     my = imu.calcMag(imu.my);
     mz = imu.calcMag(imu.mz);
 
-    // Pitch & Roll from accelerometer
-    accelPitch = atan2(ay, sqrt((ax * ax) + (az * az)));
-    accelRoll  = atan2(-ax, sqrt((ay * ay) + (az * az)));
+    accelPitch = atan2(ay, sqrt(ax*ax + az*az));
+    accelRoll  = atan2(-ax, sqrt(ay*ay + az*az));
 
-    // Tilt compensated yaw
     float Yh = (my * cos(accelRoll)) - (mz * sin(accelRoll));
     float Xh = (mx * cos(accelPitch)) +
                (my * sin(accelRoll) * sin(accelPitch)) +
                (mz * cos(accelRoll) * sin(accelPitch));
 
     compensatedYaw = atan2(Yh, Xh) * 180.0 / M_PI;
+    if (compensatedYaw < 0) compensatedYaw += 360;
 }
 
-/* ================= GETTER ================= */
-float IMU::getYaw()
-{
-    return compensatedYaw;
-}
-
-float IMU::getPitch()
-{
-    return accelPitch * 180.0 / M_PI;
-}
-
-float IMU::getRoll()
-{
-    return accelRoll * 180.0 / M_PI;
-}
+float IMU::getYaw()   { return compensatedYaw; }
+float IMU::getPitch() { return accelPitch * 180.0 / M_PI; }
+float IMU::getRoll()  { return accelRoll  * 180.0 / M_PI; }

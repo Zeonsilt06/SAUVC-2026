@@ -3,17 +3,16 @@
 
 #include <Arduino.h>
 
-class PID {
+class PID
+{
 public:
-   
     PID(double kp, double ki, double kd,
         double minOutput, double maxOutput,
-        bool angleMode);
+        bool angleMode = false);
 
     void reset();
-    void setSetpoint(double setpoint);
 
-    
+    void setSetpoint(double setpoint);
     void setGains(double kp, double ki, double kd);
     void setOutputLimits(double minOut, double maxOut);
 
@@ -33,8 +32,7 @@ private:
     double _lastError;
     unsigned long _lastTime;
 
-    
-    bool _angleMode;
+    bool _angleMode;   // true untuk yaw (0–360 / -180–180)
 };
 
-#endif // PID_H
+#endif
