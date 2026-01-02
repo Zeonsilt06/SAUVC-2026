@@ -1,14 +1,14 @@
 #include "imu.h"
 #include <math.h>
 
-#define LSM9DS0_XM  0x1D
-#define LSM9DS0_G   0x6B
 
 IMU::IMU() :
-    imu(MODE_I2C, LSM9DS0_G, LSM9DS0_XM),
-    ax(0), ay(0), az(0),
-    gx(0), gy(0), gz(0),
-    mx(0), my(0), mz(0),
+    ax(0),ay(0),az(0),
+    gx(0),gy(0),gz(0),
+    mx(0),my(0),mz(0),
+    Ax(0), Ay(0), Az(0),
+    Gx(0), Gy(0), Gz(0),
+    Mx(0), My(0), Mz(0),
     accelPitch(0), accelRoll(0),
     compensatedYaw(0)
 {
@@ -16,30 +16,40 @@ IMU::IMU() :
 
 bool IMU::begin()
 {
-    return (imu.begin() == 0x49D4);
+    Wire1.begin();
+    accelgyro.initialize();
+    mag.initialize();
+    delay(20);
+    if((accelgyro.testConnection()) && (mag.testConnection())){
+        return (true);
+    }
+    else{
+        return(false);
+    }
 }
 
 void IMU::update()
 {
-    imu.readGyro();
-    imu.readAccel();
-    imu.readMag();
+    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    mag.getHeading(&mx, &my, &mz);
 
-    ax = imu.calcAccel(imu.ax);
-    ay = imu.calcAccel(imu.ay);
-    az = imu.calcAccel(imu.az);
+    Ax = (float) ax / 16384.0;
+    Ay = (float) ay / 16384.0;
+    Az = (float) az / 16384.0;
+    Gx = (float) Gx / 131.0;
+    Gy = (float) Gy / 131.0;
+    Gz = (float) Gz / 131.0;
+    Mx = (float) Mx / 1090.0;
+    Mx = (float) Mx / 1090.0;
+    Mx = (float) Mx / 1090.0;
 
-    mx = imu.calcMag(imu.mx);
-    my = imu.calcMag(imu.my);
-    mz = imu.calcMag(imu.mz);
+    accelPitch = atan2(Ay, sqrt(Ax*Ax + Az*Az));
+    accelRoll  = atan2(-Ax, sqrt(Ay*Ay + Az*Az));
 
-    accelPitch = atan2(ay, sqrt(ax*ax + az*az));
-    accelRoll  = atan2(-ax, sqrt(ay*ay + az*az));
-
-    float Yh = (my * cos(accelRoll)) - (mz * sin(accelRoll));
-    float Xh = (mx * cos(accelPitch)) +
-               (my * sin(accelRoll) * sin(accelPitch)) +
-               (mz * cos(accelRoll) * sin(accelPitch));
+    float Yh = (My * cos(accelRoll)) - (Mz * sin(accelRoll));
+    float Xh = (Mx * cos(accelPitch)) +
+               (My * sin(accelRoll) * sin(accelPitch)) +
+               (Mz * cos(accelRoll) * sin(accelPitch));
 
     compensatedYaw = atan2(Yh, Xh) * 180.0 / M_PI;
     if (compensatedYaw < 0) compensatedYaw += 360;

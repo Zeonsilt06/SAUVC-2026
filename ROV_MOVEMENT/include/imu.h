@@ -3,8 +3,10 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <SFE_LSM9DS0.h>
-
+#include <I2Cdev.h>
+#include <MPU6050.h>
+#include <HMC5883L.h>
+    
 class IMU
 {
 public:
@@ -17,11 +19,16 @@ public:
     float getRoll();
 
 private:
-    LSM9DS0 imu;
+    HMC5883L mag;
+    MPU6050 accelgyro;
 
-    float ax, ay, az;
-    float gx, gy, gz;
-    float mx, my, mz;
+    int16_t ax, ay, az;
+    int16_t gx, gy, gz;
+    int16_t mx, my, mz;
+
+    float Ax, Ay, Az;
+    float Gx, Gy, Gz;
+    float Mx, My, Mz;
 
     float accelPitch, accelRoll;
     float compensatedYaw;
