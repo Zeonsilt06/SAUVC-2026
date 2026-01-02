@@ -1,136 +1,86 @@
-#include "ThrusterControl.h"
+#include "Thrustercontrol.h"
 
 /* ================= GLOBAL PWM ================= */
-static int thrusterPWM_1 = 1500;
-static int thrusterPWM_2 = 1500;
-static int thrusterPWM_3 = 1500;
-static int thrusterPWM_4 = 1500;
+static int currentPWM[4] = {1500, 1500, 1500, 1500};
+static int targetPWM[4]  = {1500, 1500, 1500, 1500};
 
 #define PWM_MIN 1100
 #define PWM_MAX 1900
 
-/* ================= PARAMETERS ================= */
-static const int step_size  = 3;
-static const int step_delay = 10;
-
-/* Horizontal */
-static const int cw_H  = 1600;
-static const int ccw_H = 1400;
-
-/* Vertical */
-static const int cw_V  = 1600;
-static const int ccw_V = 1400;
+// Kecepatan transisi PWM (Slew Rate)
+// Teensy sangat cepat, nilai 5-10 biasanya pas untuk kehalusan motor
+static const int step_size = 8; 
 
 /* ================= SERVOS ================= */
-static Servo thrus_1, thrus_2, //horizontal 
-            thrus_3, thrus_4; //vertical
-
-/* ================= INTERNAL ================= */
-static void smoothMove(int t1, int t2, int t3, int t4);
-static void stepTo(int *current, int target);
+static Servo thrus_1, thrus_2, // horizontal (Pin 2, 3)
+            thrus_3, thrus_4; // vertical (Pin 4, 5)
 
 /* ================= INIT ================= */
-void initMotor()
-{
-    thrus_1.attach(2); // Horizontal Left
-    thrus_2.attach(3); // Horizontal Right
-    thrus_3.attach(4); // Vertical 1
-    thrus_4.attach(5); // Vertical 2
+void initMotor() {
+    // Set awal ke netral
+    thrus_1.writeMicroseconds(1500);
+    thrus_2.writeMicroseconds(1500);
+    thrus_3.writeMicroseconds(1500);
+    thrus_4.writeMicroseconds(1500);
+
+    thrus_1.attach(2); 
+    thrus_2.attach(3); 
+    thrus_3.attach(4); 
+    thrus_4.attach(5);
+    
+    delay(100); 
 }
 
-/* ================= CORE ================= */
-static void smoothMove(int t1, int t2, int t3, int t4)
-{
-    while (thrusterPWM_1 != t1 ||
-           thrusterPWM_2 != t2 ||
-           thrusterPWM_3 != t3 ||
-           thrusterPWM_4 != t4)
-    {
-        stepTo(&thrusterPWM_1, t1);
-        stepTo(&thrusterPWM_2, t2);
-        stepTo(&thrusterPWM_3, t3);
-        stepTo(&thrusterPWM_4, t4);
+/* ================= CORE (NON-BLOCKING) ================= */
+// FUNGSI BARU: Wajib dipanggil di loop() agar motor bergerak halus ke target
+void updateMotors() {
+    for(int i = 0; i < 4; i++) {
+        if (currentPWM[i] < targetPWM[i]) currentPWM[i] += step_size;
+        else if (currentPWM[i] > targetPWM[i]) currentPWM[i] -= step_size;
 
-        // HARD LIMIT (ANTI ESC DAMAGE)
-        thrusterPWM_1 = constrain(thrusterPWM_1, PWM_MIN, PWM_MAX);
-        thrusterPWM_2 = constrain(thrusterPWM_2, PWM_MIN, PWM_MAX);
-        thrusterPWM_3 = constrain(thrusterPWM_3, PWM_MIN, PWM_MAX);
-        thrusterPWM_4 = constrain(thrusterPWM_4, PWM_MIN, PWM_MAX);
-
-        thrus_1.writeMicroseconds(thrusterPWM_1);
-        thrus_2.writeMicroseconds(thrusterPWM_2);
-        thrus_3.writeMicroseconds(thrusterPWM_3);
-        thrus_4.writeMicroseconds(thrusterPWM_4);
-
-        delay(10); 
+        // Kunci nilai jika selisih sudah sangat kecil
+        if (abs(currentPWM[i] - targetPWM[i]) < step_size) currentPWM[i] = targetPWM[i];
     }
-}
 
-static void stepTo(int *current, int target)
-{
-    if (*current < target) *current += step_size;
-    else if (*current > target) *current -= step_size;
+    thrus_1.writeMicroseconds(constrain(currentPWM[0], PWM_MIN, PWM_MAX));
+    thrus_2.writeMicroseconds(constrain(currentPWM[1], PWM_MIN, PWM_MAX));
+    thrus_3.writeMicroseconds(constrain(currentPWM[2], PWM_MIN, PWM_MAX));
+    thrus_4.writeMicroseconds(constrain(currentPWM[3], PWM_MIN, PWM_MAX));
 }
 
 /* ================= MOVEMENTS ================= */
-void stopAll()
-{
-    smoothMove(STOP_PWM, STOP_PWM, STOP_PWM, STOP_PWM);
+void stopAll() {
+    for(int i=0; i<4; i++) targetPWM[i] = 1500;
 }
 
-void forward(int offset)
-{
-    smoothMove(cw_H + offset, cw_H + offset, STOP_PWM, STOP_PWM);
+void forward(int offset) {
+    targetPWM[0] = 1500 + offset; // Motor Horiz L
+    targetPWM[1] = 1500 + offset; // Motor Horiz R
 }
 
-void reverse(int offset)
-{
-    smoothMove(ccw_H - offset, ccw_H - offset, STOP_PWM, STOP_PWM);
+void reverse(int offset) {
+    targetPWM[0] = 1500 - offset;
+    targetPWM[1] = 1500 - offset;
 }
 
-/* ================= ROTATION ================= */
-void rotateRight(int offset)
-{
-    smoothMove(cw_H + offset, ccw_H - offset, STOP_PWM, STOP_PWM);
+void rotateRight(int offset) {
+    targetPWM[0] = 1500 + offset; // Kiri maju
+    targetPWM[1] = 1500 - offset; // Kanan mundur
 }
 
-void rotateLeft(int offset)
-{
-    smoothMove(ccw_H - offset, cw_H + offset, STOP_PWM, STOP_PWM);
+void rotateLeft(int offset) {
+    targetPWM[0] = 1500 - offset; // Kiri mundur
+    targetPWM[1] = 1500 + offset; // Kanan maju
 }
 
-/* ================= VERTICAL ================= */
-void up(int offset)
-{
-    smoothMove(STOP_PWM, STOP_PWM, cw_V + offset, cw_V + offset);
+void up(int offset) {
+    targetPWM[2] = 1500 + offset; // Motor Vert 1
+    targetPWM[3] = 1500 + offset; // Motor Vert 2
 }
 
-void down(int offset)
-{
-    smoothMove(STOP_PWM, STOP_PWM, ccw_V - offset, ccw_V - offset);
+void down(int offset) {
+    targetPWM[2] = 1500 - offset;
+    targetPWM[3] = 1500 - offset;
 }
 
-/* ================= COMBINED ================= */
-void rotateRightUp(int offsetH, int offsetV)
-{
-    smoothMove(cw_H + offsetH, ccw_H - offsetH,
-               cw_V + offsetV, cw_V + offsetV);
-}
-
-void rotateLeftUp(int offsetH, int offsetV)
-{
-    smoothMove(ccw_H - offsetH, cw_H + offsetH,
-               cw_V + offsetV, cw_V + offsetV);
-}
-
-void rotateRightDown(int offsetH, int offsetV)
-{
-    smoothMove(cw_H + offsetH, ccw_H - offsetH,
-               ccw_V - offsetV, ccw_V - offsetV);
-}
-
-void rotateLeftDown(int offsetH, int offsetV)
-{
-    smoothMove(ccw_H - offsetH, cw_H + offsetH,
-               ccw_V - offsetV, ccw_V - offsetV);
-}
+// Tambahkan implementasi rotate atau reverse sesuai pola targetPWM di atas

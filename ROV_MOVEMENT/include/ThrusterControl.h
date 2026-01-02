@@ -9,6 +9,7 @@
 
 /* ================= API ================= */
 void initMotor();
+void updateMotors();
 void stopAll();
 
 /* Basic Movement */
@@ -23,10 +24,4 @@ void rotateLeft(int offset);
 void up(int offset);
 void down(int offset);
 
-/* Combined */
-void rotateRightUp(int offsetH, int offsetV);
-void rotateLeftUp(int offsetH, int offsetV);
-void rotateRightDown(int offsetH, int offsetV);
-void rotateLeftDown(int offsetH, int offsetV);
-
-#endif
+#endif // <--- BARIS INI WAJIB ADA UNTUK MENUTUP #ifndef DI ATAS
