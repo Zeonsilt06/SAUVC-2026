@@ -221,7 +221,7 @@ int8_t I2Cdev::readBytes(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8
     uint32_t t1 = millis();
 
     #if (I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE || I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_SBWIRE || I2CDEV_IMPLEMENTATION == I2CDEV_TEENSY_3X_WIRE)
-        TwoWire *useWire = &Wire;
+        TwoWire *useWire = &Wire1;
         if (wireObj) useWire = (TwoWire *)wireObj;
 
         #if (ARDUINO < 100)
@@ -333,7 +333,7 @@ int8_t I2Cdev::readWords(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint1
     uint32_t t1 = millis();
 
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE || I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_SBWIRE || I2CDEV_IMPLEMENTATION == I2CDEV_TEENSY_3X_WIRE
-        TwoWire *useWire = &Wire;
+        TwoWire *useWire = &Wire1;
         if (wireObj) useWire = (TwoWire *)wireObj;
 
         #if (ARDUINO < 100)
@@ -581,7 +581,7 @@ bool I2Cdev::writeBytes(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint8_
     uint8_t status = 0;
 
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE || I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_SBWIRE || I2CDEV_IMPLEMENTATION == I2CDEV_TEENSY_3X_WIRE
-    TwoWire *useWire = &Wire;
+    TwoWire *useWire = &Wire1;
     if (wireObj) useWire = (TwoWire *)wireObj;
 #endif
 
@@ -648,7 +648,7 @@ bool I2Cdev::writeWords(uint8_t devAddr, uint8_t regAddr, uint8_t length, uint16
     uint8_t status = 0;
 
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE || I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_SBWIRE || I2CDEV_IMPLEMENTATION == I2CDEV_TEENSY_3X_WIRE
-    TwoWire *useWire = &Wire;
+    TwoWire *useWire = &Wire1;
     if (wireObj) useWire = (TwoWire *)wireObj;
 #endif
 
