@@ -1,60 +1,105 @@
-#include "imu.h"
-#include <math.h>
+#include "IMU.h"
 
+IMU::IMU() : accelgyro(0x68, &Wire1) {}
 
-IMU::IMU() :
-    ax(0),ay(0),az(0),
-    gx(0),gy(0),gz(0),
-    mx(0),my(0),mz(0),
-    Ax(0), Ay(0), Az(0),
-    Gx(0), Gy(0), Gz(0),
-    Mx(0), My(0), Mz(0),
-    accelPitch(0), accelRoll(0),
-    compensatedYaw(0)
-{
-}
-
-bool IMU::begin()
-{
+bool IMU::begin() {
     Wire1.begin();
+    delay(100);
+
     accelgyro.initialize();
     mag.initialize();
-    delay(20);
-    if((accelgyro.testConnection()) && (mag.testConnection())){
-        return (true);
+
+    if (!accelgyro.testConnection()) {
+        Serial.println("MPU6050 connection failed!");
+        return false;
     }
-    else{
-        return(false);
+    if (!mag.testConnection()) {
+        Serial.println("HMC5883L connection failed!");
+        return false;
     }
+
+    filter.begin(100);  // 100 Hz
+    Serial.println("IMU initialized successfully.");
+    return true;
 }
 
-void IMU::update()
-{
+void IMU::update() {
+    readSensors();
+    filter.update(Gx, Gy, Gz, Ax, Ay, Az, Mx, My, Mz);
+
+    float raw_pitch = filter.getPitch();
+    float raw_roll  = filter.getRoll();
+    float raw_yaw   = filter.getYaw();
+
+    // Apply zero offset
+    raw_pitch -= pitchOffset;
+    raw_roll  -= rollOffset;
+    raw_yaw   -= yawOffset;
+
+    // Normalisasi yaw & roll ke 0-360
+    while (raw_yaw < 0) raw_yaw += 360.0;
+    while (raw_yaw >= 360) raw_yaw -= 360.0;
+    while (raw_roll < 0) raw_roll += 360.0;
+    while (raw_roll >= 360) raw_roll -= 360.0;
+
+    // Rate limiting + low-pass filter
+    float diff_roll = raw_roll - smooth_roll;
+    if (abs(diff_roll) > maxChange_roll) {
+        smooth_roll += (diff_roll > 0 ? maxChange_roll : -maxChange_roll);
+    } else {
+        smooth_roll = raw_roll;
+    }
+    smooth_roll = alpha_roll * raw_roll + (1.0 - alpha_roll) * smooth_roll;
+
+    smooth_pitch = alpha_general * raw_pitch + (1.0 - alpha_general) * smooth_pitch;
+
+    float diff_yaw = raw_yaw - smooth_yaw;
+    if (diff_yaw > 180) diff_yaw -= 360;
+    if (diff_yaw < -180) diff_yaw += 360;
+    if (abs(diff_yaw) > maxChange_general) {
+        smooth_yaw += (diff_yaw > 0 ? maxChange_general : -maxChange_general);
+    } else {
+        smooth_yaw += diff_yaw;
+    }
+    smooth_yaw = alpha_general * smooth_yaw + (1.0 - alpha_general) * smooth_yaw;
+}
+
+float IMU::getPitch() { return smooth_pitch; }
+float IMU::getRoll()  { return smooth_roll; }
+float IMU::getYaw()   { return smooth_yaw; }
+
+void IMU::calibrateZero() {
+    Serial.println("Calibrating zero... Keep sensor still for 4 seconds!");
+
+    for (int i = 0; i < 400; i++) {
+        update();
+        delay(10);
+    }
+
+    pitchOffset += filter.getPitch();
+    rollOffset  += filter.getRoll();
+    yawOffset   += filter.getYaw();
+
+    smooth_pitch = 0.0;
+    smooth_roll  = 0.0;
+    smooth_yaw   = 0.0;
+
+    Serial.println("Zero calibration complete! All axes set to 0.");
+}
+
+void IMU::readSensors() {
     accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
     mag.getHeading(&mx, &my, &mz);
 
-    Ax = (float) ax / 16384.0;
-    Ay = (float) ay / 16384.0;
-    Az = (float) az / 16384.0;
-    Gx = (float) Gx / 131.0;
-    Gy = (float) Gy / 131.0;
-    Gz = (float) Gz / 131.0;
-    Mx = (float) Mx / 1090.0;
-    Mx = (float) Mx / 1090.0;
-    Mx = (float) Mx / 1090.0;
+    Ax = ax / 16384.0;
+    Ay = ay / 16384.0;
+    Az = az / 16384.0;
 
-    accelPitch = atan2(Ay, sqrt(Ax*Ax + Az*Az));
-    accelRoll  = atan2(-Ax, sqrt(Ay*Ay + Az*Az));
+    Gx = gx / 131.0;
+    Gy = gy / 131.0;
+    Gz = gz / 131.0;
 
-    float Yh = (My * cos(accelRoll)) - (Mz * sin(accelRoll));
-    float Xh = (Mx * cos(accelPitch)) +
-               (My * sin(accelRoll) * sin(accelPitch)) +
-               (Mz * cos(accelRoll) * sin(accelPitch));
-
-    compensatedYaw = atan2(Yh, Xh) * 180.0 / M_PI;
-    if (compensatedYaw < 0) compensatedYaw += 360;
+    Mx = mx;
+    My = my;
+    Mz = mz;
 }
-
-float IMU::getYaw()   { return compensatedYaw; }
-float IMU::getPitch() { return accelPitch * 180.0 / M_PI; }
-float IMU::getRoll()  { return accelRoll  * 180.0 / M_PI; }

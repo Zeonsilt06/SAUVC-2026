@@ -1,77 +1,113 @@
 #include <Arduino.h>
-#include "Thrustercontrol.h"
-#include "imu.h"
-#include "depth.h"
-#include "PID.h"
-
-// Gunakan baud rate tinggi untuk Teensy
-#define BAUD_RATE 115200
+#include <PID_v1.h>
+#include "ThrusterControl.h"
+#include "IMU.h"
+#include "Depth.h"
 
 IMU imu;
 DepthController depth;
 
-// PID DEPTH: (Kp, Ki, Kd, MinOut, MaxOut, isAngle)
-PID depthPID(2.5, 0.08, 0.6, -200, 200, false);
+double dIn, dOut, dSet; 
+double rIn, rOut, rSet; 
+double yIn, yOut, ySet; 
+
+// PID Setup
+PID pidDepth(&dIn, &dOut, &dSet, 4.0, 0.1, 1.0, DIRECT);
+PID pidRoll(&rIn, &rOut, &rSet, 15.0, 0.5, 5.0, DIRECT);
+PID pidYaw(&yIn, &yOut, &ySet, 10.0, 0.1, 1.0, DIRECT);
 
 void setup() {
-    Serial.begin(BAUD_RATE);
-
-    // 1. Inisialisasi Thruster
+    Serial.begin(115200);
     initMotor();
-    stopAll();
-    
-    // 2. Waktu tunggu ESC Arming (Bakal bunyi Beep-Beep)
-    Serial.println("ESC Arming... JANGAN GERAKKAN ROBOT");
-    delay(4000); 
+    imu.begin();
+    depth.begin(Wire1);
 
-    // 3. Inisialisasi Sensor
-    if(!imu.begin()) Serial.println("IMU GAGAL!");
-    if(!depth.begin(Wire)) Serial.println("DEPTH SENSOR GAGAL!");
-
-    depthPID.setSetpoint(80.0); // Target kedalaman 80 cm
-    Serial.println("SYSTEM READY");
-}
-
-void loop() {
-    // ... pembacaan sensor dan PID ...
-
-    updateMotors(); // Menggerakkan motor selangkah demi selangkah ke target
-    delay(20);
-
-    // 1. Baca Sensor
+    delay(2000); // Tunggu sensor stabil
     imu.update();
     depth.update();
 
-    float currentDepth = depth.getDepth();
+    // --- PENGATURAN TARGET ---
+    dSet = 0.8;           // TARGET KEDALAMAN: 80 cm (0.8 meter)
+    ySet = (double)imu.getYaw(); // Kunci arah hadap saat ini
+    rSet = 0.0;           // Jaga robot tetap datar (roll 0)
 
-    // 2. Failsafe: Jika sensor tidak terbaca (NaN)
-    if (isnan(currentDepth)) {
-        stopAll();
+    pidDepth.SetMode(AUTOMATIC);
+    pidRoll.SetMode(AUTOMATIC);
+    pidYaw.SetMode(AUTOMATIC);
+    
+    pidDepth.SetOutputLimits(-300, 300);
+    pidRoll.SetOutputLimits(-150, 150);
+    pidYaw.SetOutputLimits(-200, 200);
+}
+
+void loop() {
+    static unsigned long lastTime = 0;
+    if (millis() - lastTime < 20) return;
+    lastTime = millis();
+
+    imu.update();
+    depth.update();
+
+    // 1. Input Sensor
+    dIn = (double)depth.getDepth();
+    rIn = (double)imu.getRoll();
+    
+    // Heading Wrap Around Logic (Agar tidak pusing saat melewati 360/0 derajat)
+    double currentYaw = (double)imu.getYaw();
+    double yawError = ySet - currentYaw;
+    if (yawError > 180) yawError -= 360;
+    else if (yawError < -180) yawError += 360;
+    yIn = -yawError;
+
+    // 2. Hitung PID
+    pidDepth.Compute();
+    pidRoll.Compute();
+    
+    // Trick untuk PID Yaw agar bekerja dengan yawError
+    double oldYSet = ySet; 
+    ySet = 0;
+    pidYaw.Compute();
+    ySet = oldYSet;
+
+    // 3. LOGIKA MISI OTOMATIS (Sesuai Urutan Waktu)
+    unsigned long runTime = millis();
+
+    if (runTime < 2000) {
+        // Detik 0-2: Persiapan di permukaan/menyelam awal
+        setForwardPower(0);
     } 
+    else if (runTime < 7000) {         
+        // Detik 2-7: MAJU sambil menjaga kedalaman 80cm
+        setForwardPower(300); 
+    } 
+    else if (runTime < 10000) {      
+        // Detik 7-10: DIAM & BELOK KANAN (Ubah arah ke 270 derajat)
+        setForwardPower(0);
+        ySet = 270.0; 
+    }
+    else if (runTime < 15000) {     
+        // Detik 10-15: MUNDUR
+        setForwardPower(-300);
+    }
     else {
-        // 3. Hitung PID
-        // Jika hasil > 0 berati robot harus naik (UP)
-        // Jika hasil < 0 berarti robot harus turun (DOWN)
-        int output = (int)depthPID.compute(currentDepth);
-
-        if (output > 0) {
-            up(output);
-        } else {
-            down(abs(output));
-        }
+        // Detik > 15: SELESAI / BERHENTI
+        setForwardPower(0);
     }
 
-    // 4. Update gerakan motor secara halus (Non-Blocking)
-    updateMotors();
+    // 4. Update Motor dengan hasil gabungan PID
+    // dOut akan bekerja otomatis menjaga kedalaman 80cm selama misi berjalan
+    updateMotors((int)yOut, (int)rOut, (int)dOut);
 
-    // 5. Telemetri (Debug)
-    static unsigned long timer = 0;
-    if (millis() - timer > 100) {
-        Serial.print("Depth: "); Serial.print(currentDepth);
-        Serial.print(" | Yaw: "); Serial.print(imu.getYaw());
-        Serial.print(" | PID Out: "); Serial.println(depthPID.compute(currentDepth));
-        timer = millis();
+    // Telemetri ke Serial Monitor
+    if (millis() % 500 < 20) {
+        Serial.print("Status: "); 
+        if(runTime < 7000) Serial.print("MAJU");
+        else if(runTime < 10000) Serial.print("BELOK");
+        else if(runTime < 15000) Serial.print("MUNDUR");
+        else Serial.print("STOP");
+        
+        Serial.print(" | Depth In:"); Serial.print(dIn);
+        Serial.print(" | Target:"); Serial.print(dSet);
+        Serial.print(" | Yaw:"); Serial.println(currentYaw);
     }
-
-    delay(20); // Loop 50Hz (Standar industri untuk robotika)
 }

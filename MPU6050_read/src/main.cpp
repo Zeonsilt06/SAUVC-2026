@@ -1,101 +1,151 @@
 #include <Arduino.h>
-
-// Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
-// is used in I2Cdev.h
-#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-    #include "Wire.h"
-#endif
-
+#include <Wire.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
 #include <HMC5883L.h>
 #include <MadgwickAHRS.h>
 
-
 HMC5883L mag;
-//MPU6050 accelgyro;
-//MPU6050 accelgyro(0x69); // <-- use for AD0 high
-MPU6050 accelgyro(0x68, &Wire1); // <-- use for AD0 low, but 2nd Wire (TWI/I2C) object
+MPU6050 accelgyro(0x68, &Wire1);
 Madgwick IMU;
 
-int16_t ax, ay, az;
-int16_t gx, gy, gz;
-int16_t mx, my, mz;
-float Ax, Ay, Az;
-float Gx, Gy, Gz;
-float Mx, My, Mz;
-float mw_pitch, mw_roll, mw_yaw;
+int16_t ax, ay, az, gx, gy, gz, mx, my, mz;
+float Ax, Ay, Az, Gx, Gy, Gz, Mx, My, Mz;
+
+// Offset magnetometer (isi 0 kalau belum kalibrasi)
+float mag_offset_x = 0.0;
+float mag_offset_y = 0.0;
+float mag_offset_z = 0.0;
+
+// Auto-zero
+float yawOffset = 0.0;
+float pitchOffset = 0.0;
+float rollOffset = 0.0;
+
+// Nilai akhir yang sudah dismoothing
+float smooth_pitch = 0.0;
+float smooth_roll  = 0.0;
+float smooth_yaw   = 0.0;
+
+// Parameter khusus untuk ROLL (dibuat lebih halus)
+const float alpha_roll  = 0.08;   // Low-pass lebih kuat untuk roll (semakin kecil = semakin halus)
+const float maxChange_roll = 2.0; // Maksimal perubahan roll per 10ms (mencegah loncat)
+
+// Parameter normal untuk pitch & yaw
+const float alpha_general = 0.15;
+const float maxChange_general = 4.0;
+
+void readSensors();
 
 void setup() {
-
     Wire1.begin();
-
     delay(500);
-
-    // initialize serial communication
     Serial.begin(115200);
 
-    // initialize device
-    Serial.println("Initializing I2C devices...");
     accelgyro.initialize();
     mag.initialize();
 
-    // verify connection
-    Serial.println("Testing device connections...");
-    Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
-    Serial.println(mag.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
+    if (accelgyro.testConnection()) Serial.println("MPU6050 OK");
+    if (mag.testConnection()) Serial.println("HMC5883L OK");
 
-    delay(500);
-    IMU.begin(35);
+    IMU.begin(100);
+
+    Serial.println("Stabilisasi & auto-zero... JANGAN GERAKKAN SENSOR 4 detik!");
+
+    for (int i = 0; i < 400; i++) {
+        readSensors();
+        IMU.update(Gx, Gy, Gz, Ax, Ay, Az, Mx, My, Mz);
+        delay(10);
+    }
+
+    yawOffset   = IMU.getYaw();
+    pitchOffset = IMU.getPitch();
+    rollOffset  = IMU.getRoll();
+
+    smooth_pitch = 0.0;
+    smooth_roll  = 0.0;
+    smooth_yaw   = 0.0;
+
+    Serial.println("Siap! Roll sekarang sangat stabil & tidak loncat-loncat lagi.");
+    Serial.println("P\tR\tY");
 }
 
 void loop() {
-  // read raw accel/gyro measurements from device
-  accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  // read raw heading measurements from device
-  mag.getHeading(&mx, &my, &mz);
+    readSensors();
+    IMU.update(Gx, Gy, Gz, Ax, Ay, Az, Mx, My, Mz);
 
-  Ax = (float) ax / 16384.0;
-  Ay = (float) ay / 16384.0;
-  Az = (float) az / 16384.0;
-  Gx = (float) gx / 131.0;
-  Gy = (float) gy / 131.0;
-  Gz = (float) gz / 131.0;
-  Mx = (float) mx / 1090.0;
-  My = (float) my / 1090.0;
-  Mz = (float) mz / 1090.0;
+    float raw_pitch = IMU.getPitch() - pitchOffset;
+    float raw_roll  = IMU.getRoll()  - rollOffset;
+    float raw_yaw   = IMU.getYaw()   - yawOffset;
 
-  IMU.update(Gx, Gy, Gz, Ax, Ay, Az, Mx, My, Mz);
-  mw_pitch = IMU.getPitch();
-  mw_roll = IMU.getRoll();
-  mw_yaw = IMU.getYaw();
+    // Normalisasi yaw & roll ke 0-360
+    while (raw_yaw < 0)     raw_yaw += 360.0;
+    while (raw_yaw >= 360)  raw_yaw -= 360.0;
 
+    while (raw_roll < 0)    raw_roll += 360.0;
+    while (raw_roll >= 360) raw_roll -= 360.0;
 
-  // display tab-separated accel/gyro x/y/z values
-//   Serial.print("a/g/m:\t");
-//   Serial.print(Ax); Serial.print("\t");
-//   Serial.print(Ay); Serial.print("\t");
-//   Serial.print(Az); Serial.print("\t");
-//   Serial.print(Gx); Serial.print("\t");
-//   Serial.print(Gy); Serial.print("\t");
-//   Serial.print(Gz); Serial.print("\t");
-//   Serial.print(Mx); Serial.print("\t");
-//   Serial.print(My); Serial.print("\t");
-//   Serial.println(Mz);
-    Serial.print(mw_pitch); Serial.print("\t");
-    Serial.print(mw_roll); Serial.print("\t");
-    Serial.println(mw_yaw);
+    // === RATE LIMITING TERPISAH ===
+    // Roll: lebih ketat
+    float diff_roll = raw_roll - smooth_roll;
+    if (abs(diff_roll) > maxChange_roll) {
+        smooth_roll += (diff_roll > 0 ? maxChange_roll : -maxChange_roll);
+    } else {
+        smooth_roll = raw_roll;
+    }
 
-  delay(10);
+    // Pitch & Yaw: normal
+    float diff_pitch = raw_pitch - smooth_pitch;
+    if (abs(diff_pitch) > maxChange_general) {
+        smooth_pitch += (diff_pitch > 0 ? maxChange_general : -maxChange_general);
+    } else {
+        smooth_pitch = raw_pitch;
+    }
+
+    float diff_yaw = raw_yaw - smooth_yaw;
+    if (diff_yaw > 180) diff_yaw -= 360;
+    if (diff_yaw < -180) diff_yaw += 360;
+    if (abs(diff_yaw) > maxChange_general) {
+        smooth_yaw += (diff_yaw > 0 ? maxChange_general : -maxChange_general);
+    } else {
+        smooth_yaw += diff_yaw;
+    }
+
+    // Normalisasi smooth_yaw & smooth_roll
+    while (smooth_yaw < 0)    smooth_yaw += 360.0;
+    while (smooth_yaw >= 360) smooth_yaw -= 360.0;
+    while (smooth_roll < 0)   smooth_roll += 360.0;
+    while (smooth_roll >= 360) smooth_roll -= 360.0;
+
+    // === LOW-PASS FILTER TERPISAH ===
+    // Roll pakai alpha lebih kecil → lebih halus
+    smooth_roll  = alpha_roll * raw_roll + (1.0 - alpha_roll) * smooth_roll;
+
+    // Pitch & Yaw pakai alpha normal
+    smooth_pitch = alpha_general * raw_pitch + (1.0 - alpha_general) * smooth_pitch;
+    smooth_yaw   = alpha_general * smooth_yaw + (1.0 - alpha_general) * smooth_yaw;
+
+    // === TAMPILKAN ===
+    Serial.print(smooth_pitch, 1); Serial.print("\t");
+    Serial.print(smooth_roll, 1);  Serial.print("\t");
+    Serial.println(smooth_yaw, 1);
+
+    delay(10);
 }
 
+void readSensors() {
+    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    mag.getHeading(&mx, &my, &mz);
 
+    Ax = ax / 16384.0;
+    Ay = ay / 16384.0;
+    Az = az / 16384.0;
 
+    Gx = gx / 131.0;
+    Gy = gy / 131.0;
+    Gz = gz / 131.0;
 
-
-
-
-
-
-
-
+    Mx = (float)mx - mag_offset_x;
+    My = (float)my - mag_offset_y;
+    Mz = (float)mz - mag_offset_z;
+}

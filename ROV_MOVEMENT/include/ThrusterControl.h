@@ -4,24 +4,13 @@
 #include <Arduino.h>
 #include <Servo.h>
 
-/* ================= CONSTANTS ================= */
-#define STOP_PWM 1500
-
-/* ================= API ================= */
 void initMotor();
-void updateMotors();
+void updateMotors(int yOut, int rOut, int dOut); // Tambahkan parameter untuk mixing
 void stopAll();
 
-/* Basic Movement */
-void forward(int offset);
-void reverse(int offset);
+/* Perintah Gerak */
+void setForwardPower(int power); 
+void setDepthTarget(double target);
+void setYawTarget(double target);
 
-/* Rotation */
-void rotateRight(int offset);
-void rotateLeft(int offset);
-
-/* Vertical */
-void up(int offset);
-void down(int offset);
-
-#endif // <--- BARIS INI WAJIB ADA UNTUK MENUTUP #ifndef DI ATAS
+#endif

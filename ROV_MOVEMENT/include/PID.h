@@ -1,38 +1,19 @@
 #ifndef PID_H
 #define PID_H
 
-#include <Arduino.h>
-
-class PID
-{
+class MyPID { // Ganti nama menjadi MyPID
 public:
-    PID(double kp, double ki, double kd,
-        double minOutput, double maxOutput,
-        bool angleMode = false);
+    MyPID(float kp = 0.0, float ki = 0.0, float kd = 0.0, float dt = 0.02); // dt diset 0.02 (sesuai loop 50Hz)
 
+    void setGains(float kp, float ki, float kd);
     void reset();
-
-    void setSetpoint(double setpoint);
-    void setGains(double kp, double ki, double kd);
-    void setOutputLimits(double minOut, double maxOut);
-
-    double compute(double input);
+    float compute(float setpoint, float measured);
 
 private:
-    double _kp;
-    double _ki;
-    double _kd;
-
-    double _minOut;
-    double _maxOut;
-
-    double _setpoint;
-
-    double _integral;
-    double _lastError;
-    unsigned long _lastTime;
-
-    bool _angleMode;   // true untuk yaw (0–360 / -180–180)
+    float _kp, _ki, _kd;
+    float _dt;
+    float _integral;
+    float _prev_error;
 };
 
 #endif
